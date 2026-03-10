@@ -5,6 +5,7 @@ Alternative mobile front-end for zeit.de — a single static HTML file (`index.h
 ## Project structure
 
 - `index.html` — the entire app: CSS + JS + HTML in one file
+- `example-index.html` — snapshot of `https://www.zeit.de/index` for reference; useful for inspecting upstream HTML structure and detecting format changes
 - Hosted on GitHub Pages at `zeit.nomeata.de` (HTTPS enforced)
 - Persistent state in `localStorage`, ephemeral state in `sessionStorage`
 
