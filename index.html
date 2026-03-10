@@ -263,9 +263,12 @@
       color: var(--zeit-dark);
     }
     .article.read .collapsed-bar::before {
-      content: "\2713\00a0";
+      content: "\2713";
       color: #bbb;
       font-size: 11px;
+      display: inline-block;
+      width: 18px;
+      text-align: center;
     }
 
     /* Read + expanded: show full article again */
@@ -288,20 +291,26 @@
       color: #aaa;
     }
     .article.hidden .collapsed-bar::before {
-      content: "\25B6\00a0";
+      content: "\25B6";
       font-size: 8px;
       vertical-align: middle;
       color: #ccc;
+      display: inline-block;
+      width: 18px;
+      text-align: center;
     }
     /* Hidden wins over read styling */
     .article.hidden.read .collapsed-bar {
       color: #aaa;
     }
     .article.hidden.read .collapsed-bar::before {
-      content: "\25B6\00a0";
+      content: "\25B6";
       font-size: 8px;
       vertical-align: middle;
       color: #ccc;
+      display: inline-block;
+      width: 18px;
+      text-align: center;
     }
 
     /* Slide-out animation */
