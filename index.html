@@ -718,17 +718,15 @@
         });
 
         el.querySelector(".collapsed-bar")?.addEventListener("click", (e) => {
+          e.preventDefault();
           e.stopPropagation();
           if (el.classList.contains("hidden")) {
-            // Unhide and unread
             toggleHidden(el.dataset.id);
             markUnread(el.dataset.id);
-            el.classList.remove("hidden", "read");
           } else if (el.classList.contains("read")) {
-            // Unread
             markUnread(el.dataset.id);
-            el.classList.remove("read", "expanded");
           }
+          render();
         });
       });
     }
