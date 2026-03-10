@@ -460,37 +460,34 @@
       const doc = parser.parseFromString(html, "text/html");
       const result = [];
       const seen = new Set();
+      let teaserCount = 0;
 
-      // 1) Full teasers (zon-teaser)
-      doc.querySelectorAll("article.zon-teaser").forEach((el, i) => {
+      function parseTeaser(el) {
         const linkEl = el.querySelector("a.zon-teaser__link");
-        if (!linkEl) return;
+        if (!linkEl) return null;
 
         let href = linkEl.getAttribute("href") || "";
         if (href.startsWith("/")) href = ZEIT_BASE + href;
-        if (!href.includes("zeit.de")) return;
+        if (!href.includes("zeit.de")) return null;
 
-        // Skip podcasts and wochenmarkt
-        if (el.querySelector('.audio-player[data-audio-type="podcast"]')) return;
-        if (/podcast|wochenmarkt/i.test(href)) return;
+        if (el.querySelector('.audio-player[data-audio-type="podcast"]')) return null;
+        if (/podcast|wochenmarkt/i.test(href)) return null;
 
         const id = href.replace(/https?:\/\//, "").replace(/[^a-z0-9]/gi, "_");
-        if (seen.has(id)) return;
+        if (seen.has(id)) return null;
         seen.add(id);
 
         const kicker = el.querySelector(".zon-teaser__kicker-text")?.textContent?.trim() || "";
-        if (/verlagsangebot|anzeige/i.test(kicker)) return;
+        if (/verlagsangebot|anzeige/i.test(kicker)) return null;
         const title = el.querySelector(".zon-teaser__title")?.textContent?.trim() || "";
         const summary = el.querySelector(".zon-teaser__summary")?.textContent?.trim() || "";
         const isZPlus = el.hasAttribute("data-zplus") || !!el.querySelector(".zplus-logo");
         const isLiveblog = /liveblog/i.test(href) || /liveblog/i.test(kicker);
 
-        // Get the smallest reasonable image
         let image = "";
         const img = el.querySelector("img.zon-teaser__media-item");
         if (img) {
           image = img.getAttribute("src") || "";
-          // Try to get a smaller variant from srcset or source
           const source = el.querySelector("picture source[media='(max-width: 360px)']");
           if (source) {
             const srcset = source.getAttribute("srcset") || "";
@@ -498,36 +495,57 @@
           }
         }
 
-        const isLead = i === 0;
+        const isLead = teaserCount === 0;
+        teaserCount++;
 
-        result.push({ id, link: href, kicker, title, summary, image, isZPlus, isLiveblog, type: isLead ? "lead" : "teaser" });
-      });
+        return { id, link: href, kicker, title, summary, image, isZPlus, isLiveblog, type: isLead ? "lead" : "teaser" };
+      }
 
-      // 2) News tickers (zon-newsteaser)
-      doc.querySelectorAll("article.zon-newsteaser").forEach(el => {
+      function parseNewsteaser(el) {
         const linkEl = el.querySelector("a.zon-newsteaser__link");
-        if (!linkEl) return;
+        if (!linkEl) return null;
 
         let href = linkEl.getAttribute("href") || "";
         if (href.startsWith("/")) href = ZEIT_BASE + href;
-        if (!href.includes("zeit.de")) return;
-
-        // Skip podcasts and wochenmarkt
-        if (/podcast|wochenmarkt/i.test(href)) return;
+        if (!href.includes("zeit.de")) return null;
+        if (/podcast|wochenmarkt/i.test(href)) return null;
 
         const id = href.replace(/https?:\/\//, "").replace(/[^a-z0-9]/gi, "_");
-        if (seen.has(id)) return;
+        if (seen.has(id)) return null;
         seen.add(id);
 
         const kicker = el.querySelector(".zon-newsteaser__kicker")?.textContent?.trim() || "";
         const title = el.querySelector(".zon-newsteaser__title")?.textContent?.trim() || "";
-
         const timeEl = el.querySelector(".zon-newsteaser__time");
         const timeText = timeEl?.textContent?.trim() || "";
         const datetime = timeEl?.getAttribute("datetime") || "";
-
         const isLiveblog = /liveblog/i.test(href) || /liveblog/i.test(kicker);
-        result.push({ id, link: href, kicker, title, summary: "", image: "", isZPlus: false, isLiveblog, type: "news", timeText, datetime });
+
+        return { id, link: href, kicker, title, summary: "", image: "", isZPlus: false, isLiveblog, type: "news", timeText, datetime };
+      }
+
+      // Walk cp-area sections in DOM order to preserve section headings
+      doc.querySelectorAll(".cp-area").forEach(area => {
+        // Extract section heading if present
+        const headingEl = area.querySelector(".headed-meta__title");
+        const heading = headingEl?.textContent?.trim().replace(/\s+/g, " ") || "";
+
+        // Collect articles from this area
+        const areaItems = [];
+        area.querySelectorAll("article.zon-teaser").forEach(el => {
+          const item = parseTeaser(el);
+          if (item) areaItems.push(item);
+        });
+        area.querySelectorAll("article.zon-newsteaser").forEach(el => {
+          const item = parseNewsteaser(el);
+          if (item) areaItems.push(item);
+        });
+
+        // Only emit heading if this area produced articles
+        if (areaItems.length > 0 && heading) {
+          result.push({ type: "_label", text: heading });
+        }
+        result.push(...areaItems);
       });
 
       return result;
@@ -619,21 +637,9 @@
       const readSet = getSet(LS_READ);
       const hiddenSet = getSet(LS_HIDDEN);
 
-      // Separate lead teasers, regular teasers, and news
-      const leads = articles.filter(a => a.type === "lead");
-      const teasers = articles.filter(a => a.type === "teaser");
-      const news = articles.filter(a => a.type === "news");
-
       let html = "";
 
-      // Render all articles in order, with a section label before news
-      const allArticles = [...leads, ...teasers];
-      if (news.length > 0) {
-        allArticles.push({ type: "_label", text: "Newsticker" });
-        allArticles.push(...news);
-      }
-
-      for (const a of allArticles) {
+      for (const a of articles) {
         if (a.type === "_label") {
           html += `<div class="section-label">${esc(a.text)}</div>`;
           continue;
