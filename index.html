@@ -479,6 +479,7 @@
         seen.add(id);
 
         const kicker = el.querySelector(".zon-teaser__kicker-text")?.textContent?.trim() || "";
+        if (/verlagsangebot/i.test(kicker)) return;
         const title = el.querySelector(".zon-teaser__title")?.textContent?.trim() || "";
         const summary = el.querySelector(".zon-teaser__summary")?.textContent?.trim() || "";
         const isZPlus = el.hasAttribute("data-zplus") || !!el.querySelector(".zplus-logo");
