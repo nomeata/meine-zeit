@@ -95,5 +95,10 @@ Two types of article teasers on section pages:
 - **Swipe backgrounds use pointer-events: none**: the absolutely-positioned swipe overlay divs would otherwise intercept taps on collapsed bars
 - **Liveblogs never marked read**: they're ongoing content that changes, so collapsing them would be counterproductive
 
-## NixOS note
-This is a NixOS machine. If tools like python3 or headless browsers are needed, use `nix shell nixpkgs#python3` etc.
+## Development
+
+- `flake.nix` provides a dev shell with Node.js and curl: `nix develop`
+- `test-parser.mjs` tests the parser offline against `example-index.html` using jsdom
+- Run: `nix develop -c bash -c "npm install --no-save jsdom && node test-parser.mjs"`
+- `example-index.html` is a snapshot of the zeit.de homepage for offline testing and format comparison
+- This is a NixOS machine; use `nix develop` or `nix shell nixpkgs#<pkg>` for tools
