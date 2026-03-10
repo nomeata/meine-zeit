@@ -910,7 +910,6 @@
           const el = document.querySelector(`.article[data-id="${CSS.escape(lastId)}"]`);
           if (el) {
             el.classList.add("last-visited");
-            el.scrollIntoView({ block: "center" });
           }
           sessionStorage.removeItem("mz_last");
         }
