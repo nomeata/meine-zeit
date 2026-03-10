@@ -725,6 +725,7 @@
       // Mark read in storage but don't collapse yet (skip for liveblogs)
       if (!isLiveblog) markRead(el.dataset.id);
       sessionStorage.setItem(SS_LAST, el.dataset.id);
+      setCachedArticles(articles); // refresh cache timestamp on navigation
 
       el.classList.add("checking");
       let finalURL;
