@@ -13,6 +13,17 @@
       --zeit-light: #f5f5f5;
       --zeit-border: #d9d9d9;
       --zeit-bg: #ffffff;
+      color-scheme: light dark;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --zeit-dark: #e8e8e8;
+        --zeit-grey: #999;
+        --zeit-light: #1e1e1e;
+        --zeit-border: #333;
+        --zeit-bg: #121212;
+      }
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -138,15 +149,12 @@
       font-weight: 600;
     }
 
-    /* Swipe background */
-    .swipe-bg {
+    /* Swipe backgrounds */
+    .swipe-bg, .swipe-bg-right {
       position: absolute;
       top: 0; right: 0; bottom: 0; left: 0;
-      background: var(--zeit-red);
       display: flex;
       align-items: center;
-      justify-content: flex-end;
-      padding-right: 24px;
       color: white;
       font-size: 14px;
       font-weight: 600;
@@ -154,7 +162,20 @@
       transition: opacity 0.2s;
     }
 
-    .article.swiping .swipe-bg { opacity: 1; }
+    .swipe-bg {
+      background: var(--zeit-red);
+      justify-content: flex-end;
+      padding-right: 24px;
+    }
+
+    .swipe-bg-right {
+      background: #2a7b2a;
+      justify-content: flex-start;
+      padding-left: 24px;
+    }
+
+    .article.swiping-left .swipe-bg { opacity: 1; }
+    .article.swiping-right .swipe-bg-right { opacity: 1; }
 
     .article-kicker {
       font-size: 12px;
@@ -191,7 +212,7 @@
 
     .badge-zplus {
       display: inline-block;
-      background: var(--zeit-dark);
+      background: #1a1a1a;
       color: white;
       border-radius: 3px;
       padding: 1px 5px;
@@ -199,6 +220,13 @@
       font-weight: 700;
       vertical-align: middle;
       margin-right: 4px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .badge-zplus {
+        background: #e8e8e8;
+        color: #121212;
+      }
     }
 
     /* Collapsed bar (shared by read & hidden) */
@@ -624,6 +652,7 @@
           // Lead: big image on top
           html += `<div class="${cls}" data-id="${esc(a.id)}">
   <div class="swipe-bg">Ausblenden</div>
+  <div class="swipe-bg-right">Öffnen</div>
   <a class="article-inner" href="${href}" target="_blank" rel="noopener">
     <img class="article-img" src="${esc(a.image)}" alt="" loading="lazy">
     <div class="article-body">
@@ -642,6 +671,7 @@
           // Newsticker: compact, no image
           html += `<div class="${cls}" data-id="${esc(a.id)}">
   <div class="swipe-bg">Ausblenden</div>
+  <div class="swipe-bg-right">Öffnen</div>
   <a class="article-inner" href="${href}" target="_blank" rel="noopener">
     <div class="article-body">
       <div class="article-text">
@@ -657,6 +687,7 @@
           // Standard teaser: text + optional thumbnail
           html += `<div class="${cls}" data-id="${esc(a.id)}">
   <div class="swipe-bg">Ausblenden</div>
+  <div class="swipe-bg-right">Öffnen</div>
   <a class="article-inner" href="${href}" target="_blank" rel="noopener">
     <div class="article-body">
       <div class="article-text">
@@ -678,29 +709,50 @@
       attachListeners();
     }
 
+    // --- Open article: resolve URL, mark read, collapse only when user returns ---
+    async function openArticle(el) {
+      const baseURL = el.querySelector(".article-inner")?.getAttribute("href");
+      if (!baseURL) return;
+
+      // Mark read in storage but don't collapse yet
+      markRead(el.dataset.id);
+
+      el.classList.add("checking");
+      let finalURL;
+      try {
+        finalURL = await resolveArticleURL(baseURL);
+      } catch {
+        finalURL = baseURL;
+      }
+      el.classList.remove("checking");
+
+      window.open(finalURL, "_blank", "noopener");
+
+      // Collapse when the user returns to this tab
+      const collapse = () => {
+        el.classList.add("read");
+        el.classList.remove("expanded");
+        document.removeEventListener("visibilitychange", onReturn);
+      };
+      const onReturn = () => {
+        if (!document.hidden) collapse();
+      };
+      // If the page is already visible (popup blocker etc.), collapse after a delay
+      if (!document.hidden) {
+        setTimeout(collapse, 500);
+      } else {
+        document.addEventListener("visibilitychange", onReturn);
+      }
+    }
+
     function attachListeners() {
       document.querySelectorAll("#articles .article").forEach(el => {
         setupSwipe(el);
 
-        el.querySelector(".article-inner")?.addEventListener("click", async (e) => {
+        el.querySelector(".article-inner")?.addEventListener("click", (e) => {
           e.preventDefault();
           if (el.classList.contains("checking")) return;
-
-          markRead(el.dataset.id);
-          el.classList.add("read");
-          el.classList.remove("expanded");
-
-          const baseURL = el.querySelector(".article-inner")?.getAttribute("href");
-          if (!baseURL) return;
-
-          el.classList.add("checking");
-          try {
-            const finalURL = await resolveArticleURL(baseURL);
-            window.open(finalURL, "_blank", "noopener");
-          } catch {
-            window.open(baseURL, "_blank", "noopener");
-          }
-          el.classList.remove("checking");
+          openArticle(el);
         });
 
         el.querySelector(".collapsed-bar")?.addEventListener("click", (e) => {
@@ -731,14 +783,13 @@
         currentX = startX;
         isDragging = true;
         isHorizontal = null;
-        el.classList.add("swiping");
       }, { passive: true });
 
       inner.addEventListener("touchmove", (e) => {
         if (!isDragging) return;
         const t = e.touches[0];
         currentX = t.clientX;
-        const diffX = startX - currentX;
+        const diffX = startX - currentX; // positive = left swipe, negative = right swipe
         const diffY = Math.abs(t.clientY - startY);
 
         if (isHorizontal === null && (Math.abs(diffX) > 10 || diffY > 10)) {
@@ -747,13 +798,21 @@
 
         if (!isHorizontal) {
           isDragging = false;
-          el.classList.remove("swiping");
+          el.classList.remove("swiping-left", "swiping-right");
           inner.style.transform = "";
           return;
         }
 
+        e.preventDefault();
         if (diffX > 0) {
-          e.preventDefault();
+          // Left swipe (hide)
+          el.classList.add("swiping-left");
+          el.classList.remove("swiping-right");
+          inner.style.transform = `translateX(${-diffX}px)`;
+        } else {
+          // Right swipe (open)
+          el.classList.add("swiping-right");
+          el.classList.remove("swiping-left");
           inner.style.transform = `translateX(${-diffX}px)`;
         }
       }, { passive: false });
@@ -764,16 +823,22 @@
         const diffX = startX - currentX;
 
         if (isHorizontal && diffX > 100) {
-          el.classList.remove("swiping");
+          // Left swipe: hide
+          el.classList.remove("swiping-left", "swiping-right");
           el.classList.add("sliding-out");
           inner.style.transform = "";
           setTimeout(() => {
             toggleHidden(el.dataset.id);
-            el.classList.remove("sliding-out", "swiping");
+            el.classList.remove("sliding-out");
             el.classList.add("hidden");
           }, 300);
+        } else if (isHorizontal && diffX < -100) {
+          // Right swipe: open article
+          el.classList.remove("swiping-left", "swiping-right");
+          inner.style.transform = "";
+          openArticle(el);
         } else {
-          el.classList.remove("swiping");
+          el.classList.remove("swiping-left", "swiping-right");
           inner.style.transform = "";
         }
       };
