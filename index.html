@@ -395,9 +395,11 @@
 
     const LS_READ   = "mz_read";
     const LS_HIDDEN = "mz_hidden";
+    const SS_CACHE  = "mz_cache";
+    const SS_LAST   = "mz_last";
+    const CACHE_MAX_AGE = 20 * 60 * 1000; // 20 minutes
 
     let articles = [];
-    let lastOpenedId = null;
 
     // --- LocalStorage helpers ---
     function getSet(key) {
@@ -717,7 +719,7 @@
 
       // Mark read in storage but don't collapse yet (skip for liveblogs)
       if (!isLiveblog) markRead(el.dataset.id);
-      lastOpenedId = el.dataset.id;
+      sessionStorage.setItem(SS_LAST, el.dataset.id);
 
       el.classList.add("checking");
       let finalURL;
@@ -834,10 +836,34 @@
       inner.addEventListener("touchcancel", onEnd, { passive: true });
     }
 
+    // --- Session cache ---
+    function getCachedArticles() {
+      try {
+        const { ts, data } = JSON.parse(sessionStorage.getItem(SS_CACHE));
+        return (Date.now() - ts < CACHE_MAX_AGE) ? data : null;
+      } catch { return null; }
+    }
+
+    function setCachedArticles(data) {
+      try { sessionStorage.setItem(SS_CACHE, JSON.stringify({ ts: Date.now(), data })); }
+      catch { /* quota */ }
+    }
+
     // --- Load articles ---
-    async function loadSection() {
+    async function loadSection(forceRefresh) {
       const statusEl = document.getElementById("status");
       const articlesEl = document.getElementById("articles");
+
+      if (!forceRefresh) {
+        const cached = getCachedArticles();
+        if (cached) {
+          articles = cached;
+          statusEl.style.display = "none";
+          render();
+          highlightLast();
+          return;
+        }
+      }
 
       statusEl.innerHTML = '<div class="loading-spinner"></div><br>Lade Artikel&hellip;';
       statusEl.style.display = "block";
@@ -848,6 +874,7 @@
       try {
         const html = await fetchPage(url);
         articles = parseZeitHTML(html);
+        setCachedArticles(articles);
         statusEl.style.display = "none";
 
         if (articles.length === 0) {
@@ -867,8 +894,17 @@
       }
     }
 
+    // --- Highlight last-visited article ---
+    function highlightLast() {
+      const lastId = sessionStorage.getItem(SS_LAST);
+      if (!lastId) return;
+      const el = document.querySelector(`.article[data-id="${CSS.escape(lastId)}"]`);
+      if (el) el.classList.add("last-visited");
+      sessionStorage.removeItem(SS_LAST);
+    }
+
     // --- Button handlers ---
-    document.getElementById("btn-refresh").addEventListener("click", loadSection);
+    document.getElementById("btn-refresh").addEventListener("click", () => loadSection(true));
     document.getElementById("btn-unhide-all").addEventListener("click", () => {
       unhideAll();
       document.querySelectorAll(".article.hidden").forEach(el => el.classList.remove("hidden"));
@@ -881,11 +917,7 @@
     window.addEventListener("pageshow", (e) => {
       if (e.persisted && articles.length > 0) {
         render();
-        if (lastOpenedId) {
-          const el = document.querySelector(`.article[data-id="${CSS.escape(lastOpenedId)}"]`);
-          if (el) el.classList.add("last-visited");
-          lastOpenedId = null;
-        }
+        highlightLast();
       }
     });
   </script>
