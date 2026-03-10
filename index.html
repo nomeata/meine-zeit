@@ -795,9 +795,10 @@
             el.classList.add("hidden");
           }, 300);
         } else if (isHorizontal && diffX < -100) {
-          // Right swipe: open article
-          el.classList.remove("swiping-left", "swiping-right");
-          inner.style.transform = "";
+          // Right swipe: keep swiped open while loading
+          el.classList.remove("swiping-left");
+          el.classList.add("swiping-right");
+          inner.style.transform = `translateX(${-diffX}px)`;
           openArticle(el);
         } else {
           el.classList.remove("swiping-left", "swiping-right");
