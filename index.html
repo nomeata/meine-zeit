@@ -314,6 +314,11 @@
       text-align: center;
     }
 
+    /* Last-visited indicator */
+    .article.last-visited {
+      border-bottom: 3px solid var(--zeit-red);
+    }
+
     /* Slide-out animation */
     .article.sliding-out .article-inner {
       transform: translateX(-110%);
@@ -704,6 +709,7 @@
 
       // Mark read in storage but don't collapse yet (skip for liveblogs)
       if (!isLiveblog) markRead(el.dataset.id);
+      sessionStorage.setItem("mz_last", el.dataset.id);
 
       el.classList.add("checking");
       let finalURL;
@@ -897,7 +903,18 @@
 
     // Re-render on back navigation (bfcache) to reflect read state
     window.addEventListener("pageshow", (e) => {
-      if (e.persisted && articles.length > 0) render();
+      if (e.persisted && articles.length > 0) {
+        render();
+        const lastId = sessionStorage.getItem("mz_last");
+        if (lastId) {
+          const el = document.querySelector(`.article[data-id="${CSS.escape(lastId)}"]`);
+          if (el) {
+            el.classList.add("last-visited");
+            el.scrollIntoView({ block: "center" });
+          }
+          sessionStorage.removeItem("mz_last");
+        }
+      }
     });
   </script>
 </body>
