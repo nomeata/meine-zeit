@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Meine ZEIT</title>
+  <style>
+    :root {
+      --zeit-red: #e60005;
+      --zeit-dark: #1a1a1a;
+      --zeit-grey: #767676;
+      --zeit-light: #f5f5f5;
+      --zeit-border: #d9d9d9;
+      --zeit-bg: #ffffff;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--zeit-bg);
+      color: var(--zeit-dark);
+      -webkit-text-size-adjust: 100%;
+      overflow-x: hidden;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--zeit-bg);
+      border-bottom: 3px solid var(--zeit-dark);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 {
+      font-family: Georgia, "Times New Roman", Times, serif;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    header h1 span { color: var(--zeit-red); }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .header-btn {
+      background: none;
+      border: 1px solid var(--zeit-border);
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 13px;
+      color: var(--zeit-grey);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .header-btn:active { background: var(--zeit-light); }
+
+    #status {
+      text-align: center;
+      padding: 40px 16px;
+      color: var(--zeit-grey);
+      font-size: 14px;
+    }
+
+    #articles { padding-bottom: 60px; }
+
+    /* --- Articles --- */
+    .article {
+      border-bottom: 1px solid var(--zeit-border);
+      position: relative;
+      overflow: hidden;
+      transition: max-height 0.3s ease, opacity 0.3s ease;
+      max-height: 800px;
+    }
+
+    .article-inner {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      position: relative;
+      transition: transform 0.2s ease;
+      background: var(--zeit-bg);
+    }
+
+    .article.swiping .article-inner { transition: none; }
+
+    /* Lead article (first, with big image) */
+    .article.lead .article-img {
+      width: 100%;
+      aspect-ratio: 16/9;
+      object-fit: cover;
+      display: block;
+    }
+
+    .article.lead .article-body {
+      padding: 12px 16px 14px;
+    }
+
+    .article.lead .article-title {
+      font-size: 22px;
+    }
+
+    /* Standard article (text + thumbnail) */
+    .article-body {
+      display: flex;
+      padding: 12px 16px;
+      gap: 12px;
+    }
+
+    .article-text { flex: 1; min-width: 0; }
+
+    .article-thumb {
+      flex: 0 0 100px;
+      height: 66px;
+      object-fit: cover;
+      border-radius: 3px;
+      align-self: center;
+    }
+
+    /* News ticker articles (no image) */
+    .article.newsticker .article-body {
+      padding: 10px 16px;
+      display: block;
+    }
+
+    .article.newsticker .article-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    /* Swipe background */
+    .swipe-bg {
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
+      background: var(--zeit-red);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 24px;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .article.swiping .swipe-bg { opacity: 1; }
+
+    .article-kicker {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--zeit-red);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 3px;
+    }
+
+    .article-title {
+      font-family: Georgia, "Times New Roman", Times, serif;
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 4px;
+      color: var(--zeit-dark);
+    }
+
+    .article-desc {
+      font-size: 14px;
+      line-height: 1.45;
+      color: var(--zeit-grey);
+    }
+
+    .article-meta {
+      margin-top: 5px;
+      font-size: 11px;
+      color: #999;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .badge-zplus {
+      display: inline-block;
+      background: var(--zeit-dark);
+      color: white;
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-size: 10px;
+      font-weight: 700;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+
+    /* Collapsed bar (shared by read & hidden) */
+    .collapsed-bar {
+      display: none;
+      padding: 9px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Read state: collapsed bar, normal look */
+    .article.read .article-inner { display: none; }
+    .article.read .swipe-bg { display: none; }
+    .article.read {
+      max-height: 38px;
+    }
+    .article.read .collapsed-bar {
+      display: block;
+      color: var(--zeit-dark);
+    }
+    .article.read .collapsed-bar::before {
+      content: "\2713\00a0";
+      color: #bbb;
+      font-size: 11px;
+    }
+
+    /* Read + expanded: show full article again */
+    .article.read.expanded {
+      max-height: 800px;
+    }
+    .article.read.expanded .article-inner { display: block; }
+    .article.read.expanded .collapsed-bar { display: none; }
+    .article.read.expanded .swipe-bg { display: block; }
+
+    /* Hidden state: collapsed bar, muted */
+    .article.hidden {
+      max-height: 38px;
+      opacity: 0.5;
+    }
+    .article.hidden .article-inner { display: none; }
+    .article.hidden .swipe-bg { display: none; }
+    .article.hidden .collapsed-bar {
+      display: block;
+      color: #aaa;
+    }
+    .article.hidden .collapsed-bar::before {
+      content: "\25B6\00a0";
+      font-size: 8px;
+      vertical-align: middle;
+      color: #ccc;
+    }
+    /* Hidden wins over read styling */
+    .article.hidden.read .collapsed-bar {
+      color: #aaa;
+    }
+    .article.hidden.read .collapsed-bar::before {
+      content: "\25B6\00a0";
+      font-size: 8px;
+      vertical-align: middle;
+      color: #ccc;
+    }
+
+    /* Slide-out animation */
+    .article.sliding-out .article-inner {
+      transform: translateX(-110%);
+      transition: transform 0.3s ease;
+    }
+    .article.sliding-out .swipe-bg { opacity: 1; }
+
+    /* Section dividers */
+    .section-label {
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--zeit-grey);
+      background: var(--zeit-light);
+      border-bottom: 1px solid var(--zeit-border);
+    }
+
+    /* Feed tabs */
+    .feed-tabs {
+      display: flex;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--zeit-border);
+      background: var(--zeit-light);
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .feed-tabs::-webkit-scrollbar { display: none; }
+
+    .feed-tab {
+      flex: 0 0 auto;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--zeit-grey);
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .feed-tab.active {
+      color: var(--zeit-dark);
+      border-bottom-color: var(--zeit-red);
+    }
+    .feed-tab:active { background: rgba(0,0,0,0.05); }
+
+    .error-msg {
+      color: var(--zeit-red);
+      padding: 20px 16px;
+      text-align: center;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--zeit-border);
+      border-top-color: var(--zeit-red);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Article-level loading overlay */
+    .article.checking .article-inner::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      right: 16px;
+      width: 16px;
+      height: 16px;
+      margin-top: -8px;
+      border: 2px solid var(--zeit-border);
+      border-top-color: var(--zeit-red);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Meine <span>ZEIT</span></h1>
+    <div class="header-actions">
+      <button class="header-btn" id="btn-unhide-all">Alle zeigen</button>
+      <button class="header-btn" id="btn-refresh">&#8635;</button>
+    </div>
+  </header>
+
+  <nav class="feed-tabs" id="feed-tabs"></nav>
+  <div id="status"><div class="loading-spinner"></div><br>Lade Artikel&hellip;</div>
+  <div id="articles"></div>
+
+  <script>
+    // --- Configuration ---
+    const SECTIONS = [
+      { id: "index",       label: "Start",       path: "/index" },
+      { id: "politik",     label: "Politik",      path: "/politik/index" },
+      { id: "wirtschaft",  label: "Wirtschaft",   path: "/wirtschaft/index" },
+      { id: "wissen",      label: "Wissen",       path: "/wissen/index" },
+      { id: "digital",     label: "Digital",      path: "/digital/index" },
+      { id: "kultur",      label: "Kultur",       path: "/kultur/index" },
+      { id: "sport",       label: "Sport",        path: "/sport/index" },
+      { id: "gesellschaft",label: "Gesellschaft", path: "/gesellschaft/index" },
+      { id: "arbeit",      label: "Arbeit",       path: "/arbeit/index" },
+    ];
+
+    const ZEIT_BASE = "https://www.zeit.de";
+
+    const CORS_PROXIES = [
+      url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+      url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    ];
+
+    const LS_READ   = "mz_read";
+    const LS_HIDDEN = "mz_hidden";
+    const LS_FEED   = "mz_feed";
+
+    let currentSection = localStorage.getItem(LS_FEED) || "index";
+    let articles = [];
+
+    // --- LocalStorage helpers ---
+    function getSet(key) {
+      try { return new Set(JSON.parse(localStorage.getItem(key) || "[]")); }
+      catch { return new Set(); }
+    }
+
+    function saveSet(key, set) {
+      const arr = [...set];
+      if (arr.length > 3000) arr.splice(0, arr.length - 3000);
+      localStorage.setItem(key, JSON.stringify(arr));
+    }
+
+    function markRead(id) {
+      const s = getSet(LS_READ); s.add(id); saveSet(LS_READ, s);
+    }
+
+    function toggleHidden(id) {
+      const s = getSet(LS_HIDDEN);
+      if (s.has(id)) s.delete(id); else s.add(id);
+      saveSet(LS_HIDDEN, s);
+      return s.has(id);
+    }
+
+    function unhideAll() {
+      localStorage.setItem(LS_HIDDEN, "[]");
+    }
+
+    // --- Fetch via CORS proxy ---
+    async function fetchPage(url) {
+      let lastError;
+      for (const mkProxy of CORS_PROXIES) {
+        try {
+          const resp = await fetch(mkProxy(url), { signal: AbortSignal.timeout(15000) });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const text = await resp.text();
+          if (text.startsWith('{"error"')) throw new Error(text);
+          return text;
+        } catch (e) {
+          lastError = e;
+        }
+      }
+      throw lastError;
+    }
+
+    // --- Parse zeit.de HTML into article objects ---
+    function parseZeitHTML(html) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      const result = [];
+      const seen = new Set();
+
+      // 1) Full teasers (zon-teaser)
+      doc.querySelectorAll("article.zon-teaser").forEach((el, i) => {
+        const linkEl = el.querySelector("a.zon-teaser__link");
+        if (!linkEl) return;
+
+        let href = linkEl.getAttribute("href") || "";
+        if (href.startsWith("/")) href = ZEIT_BASE + href;
+        if (!href.includes("zeit.de")) return;
+
+        const id = href.replace(/https?:\/\//, "").replace(/[^a-z0-9]/gi, "_");
+        if (seen.has(id)) return;
+        seen.add(id);
+
+        const kicker = el.querySelector(".zon-teaser__kicker-text")?.textContent?.trim() || "";
+        const title = el.querySelector(".zon-teaser__title")?.textContent?.trim() || "";
+        const summary = el.querySelector(".zon-teaser__summary")?.textContent?.trim() || "";
+        const isZPlus = el.hasAttribute("data-zplus") || !!el.querySelector(".zplus-logo");
+
+        // Get the smallest reasonable image
+        let image = "";
+        const img = el.querySelector("img.zon-teaser__media-item");
+        if (img) {
+          image = img.getAttribute("src") || "";
+          // Try to get a smaller variant from srcset or source
+          const source = el.querySelector("picture source[media='(max-width: 360px)']");
+          if (source) {
+            const srcset = source.getAttribute("srcset") || "";
+            image = srcset.split(",")[0].trim().split(" ")[0] || image;
+          }
+        }
+
+        const isLead = i === 0;
+
+        result.push({ id, link: href, kicker, title, summary, image, isZPlus, type: isLead ? "lead" : "teaser" });
+      });
+
+      // 2) News tickers (zon-newsteaser)
+      doc.querySelectorAll("article.zon-newsteaser").forEach(el => {
+        const linkEl = el.querySelector("a.zon-newsteaser__link");
+        if (!linkEl) return;
+
+        let href = linkEl.getAttribute("href") || "";
+        if (href.startsWith("/")) href = ZEIT_BASE + href;
+        if (!href.includes("zeit.de")) return;
+
+        const id = href.replace(/https?:\/\//, "").replace(/[^a-z0-9]/gi, "_");
+        if (seen.has(id)) return;
+        seen.add(id);
+
+        const kicker = el.querySelector(".zon-newsteaser__kicker")?.textContent?.trim() || "";
+        const title = el.querySelector(".zon-newsteaser__title")?.textContent?.trim() || "";
+
+        const timeEl = el.querySelector(".zon-newsteaser__time");
+        const timeText = timeEl?.textContent?.trim() || "";
+        const datetime = timeEl?.getAttribute("datetime") || "";
+
+        result.push({ id, link: href, kicker, title, summary: "", image: "", isZPlus: false, type: "news", timeText, datetime });
+      });
+
+      return result;
+    }
+
+    // --- Komplettansicht check ---
+    const LS_KOMPLETT = "mz_komplett"; // cache: url -> true/false
+
+    function getKomplettCache() {
+      try { return JSON.parse(localStorage.getItem(LS_KOMPLETT) || "{}"); }
+      catch { return {}; }
+    }
+
+    function setKomplettCache(url, hasIt) {
+      const cache = getKomplettCache();
+      cache[url] = hasIt;
+      // Keep cache bounded
+      const keys = Object.keys(cache);
+      if (keys.length > 1000) {
+        for (const k of keys.slice(0, keys.length - 1000)) delete cache[k];
+      }
+      localStorage.setItem(LS_KOMPLETT, JSON.stringify(cache));
+    }
+
+    // URLs that never have /komplettansicht
+    function skipKomplettCheck(url) {
+      return /liveblog|podcast|video|\/news\//.test(url);
+    }
+
+    // Try HEAD on /komplettansicht, fall back to regular URL
+    async function resolveArticleURL(url) {
+      const clean = url.replace(/\/+$/, "");
+      if (skipKomplettCheck(clean)) return clean;
+
+      const cache = getKomplettCache();
+      if (clean in cache) {
+        return cache[clean] ? clean + "/komplettansicht" : clean;
+      }
+
+      const komplettUrl = clean + "/komplettansicht";
+      for (const mkProxy of CORS_PROXIES) {
+        try {
+          const resp = await fetch(mkProxy(komplettUrl), {
+            method: "HEAD",
+            signal: AbortSignal.timeout(5000),
+          });
+          const hasIt = resp.ok;
+          setKomplettCache(clean, hasIt);
+          return hasIt ? komplettUrl : clean;
+        } catch {
+          // proxy might not support HEAD, try next
+        }
+      }
+
+      // All proxies failed — just use the regular URL
+      setKomplettCache(clean, false);
+      return clean;
+    }
+
+    // --- Format time ---
+    function formatTime(datetime, timeText) {
+      if (timeText) return timeText;
+      if (!datetime) return "";
+      try {
+        const date = new Date(datetime);
+        const now = new Date();
+        const diffMins = Math.floor((now - date) / 60000);
+        if (diffMins < 1) return "gerade eben";
+        if (diffMins < 60) return `vor ${diffMins} Min.`;
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `vor ${diffHours} Std.`;
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffDays === 1) return "gestern";
+        if (diffDays < 7) return `vor ${diffDays} Tagen`;
+        return date.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+      } catch { return ""; }
+    }
+
+    // --- Escape HTML ---
+    function esc(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // --- Render ---
+    function render() {
+      const container = document.getElementById("articles");
+      const readSet = getSet(LS_READ);
+      const hiddenSet = getSet(LS_HIDDEN);
+
+      // Separate lead teasers, regular teasers, and news
+      const leads = articles.filter(a => a.type === "lead");
+      const teasers = articles.filter(a => a.type === "teaser");
+      const news = articles.filter(a => a.type === "news");
+
+      let html = "";
+
+      // Render all articles in order, with a section label before news
+      const allArticles = [...leads, ...teasers];
+      if (news.length > 0) {
+        allArticles.push({ type: "_label", text: "Newsticker" });
+        allArticles.push(...news);
+      }
+
+      for (const a of allArticles) {
+        if (a.type === "_label") {
+          html += `<div class="section-label">${esc(a.text)}</div>`;
+          continue;
+        }
+
+        const cls = [
+          "article",
+          a.type === "lead" ? "lead" : "",
+          a.type === "news" ? "newsticker" : "",
+          readSet.has(a.id) ? "read" : "",
+          hiddenSet.has(a.id) ? "hidden" : "",
+        ].filter(Boolean).join(" ");
+
+        const zplusBadge = a.isZPlus ? '<span class="badge-zplus">Z+</span>' : "";
+        const href = esc(a.link);
+        const time = formatTime(a.datetime, a.timeText);
+
+        if (a.type === "lead" && a.image) {
+          // Lead: big image on top
+          html += `<div class="${cls}" data-id="${esc(a.id)}">
+  <div class="swipe-bg">Ausblenden</div>
+  <a class="article-inner" href="${href}" target="_blank" rel="noopener">
+    <img class="article-img" src="${esc(a.image)}" alt="" loading="lazy">
+    <div class="article-body">
+      <div class="article-text">
+        ${a.kicker ? `<div class="article-kicker">${zplusBadge}${esc(a.kicker)}</div>` : (zplusBadge ? `<div class="article-kicker">${zplusBadge}</div>` : "")}
+        <div class="article-title">${esc(a.title)}</div>
+        ${a.summary ? `<div class="article-desc">${esc(a.summary)}</div>` : ""}
+        <div class="article-meta">
+        </div>
+      </div>
+    </div>
+  </a>
+  <div class="collapsed-bar">${esc(a.title)}</div>
+</div>`;
+        } else if (a.type === "news") {
+          // Newsticker: compact, no image
+          html += `<div class="${cls}" data-id="${esc(a.id)}">
+  <div class="swipe-bg">Ausblenden</div>
+  <a class="article-inner" href="${href}" target="_blank" rel="noopener">
+    <div class="article-body">
+      <div class="article-text">
+        ${a.kicker ? `<div class="article-kicker">${esc(a.kicker)}</div>` : ""}
+        <div class="article-title">${esc(a.title)}</div>
+        ${time ? `<div class="article-meta"><span>${esc(time)}</span></div>` : ""}
+      </div>
+    </div>
+  </a>
+  <div class="collapsed-bar">${esc(a.title)}</div>
+</div>`;
+        } else {
+          // Standard teaser: text + optional thumbnail
+          html += `<div class="${cls}" data-id="${esc(a.id)}">
+  <div class="swipe-bg">Ausblenden</div>
+  <a class="article-inner" href="${href}" target="_blank" rel="noopener">
+    <div class="article-body">
+      <div class="article-text">
+        ${a.kicker ? `<div class="article-kicker">${zplusBadge}${esc(a.kicker)}</div>` : (zplusBadge ? `<div class="article-kicker">${zplusBadge}</div>` : "")}
+        <div class="article-title">${esc(a.title)}</div>
+        ${a.summary ? `<div class="article-desc">${esc(a.summary)}</div>` : ""}
+        <div class="article-meta">
+        </div>
+      </div>
+      ${a.image ? `<img class="article-thumb" src="${esc(a.image)}" alt="" loading="lazy">` : ""}
+    </div>
+  </a>
+  <div class="collapsed-bar">${esc(a.title)}</div>
+</div>`;
+        }
+      }
+
+      container.innerHTML = html;
+      attachListeners();
+    }
+
+    function attachListeners() {
+      document.querySelectorAll("#articles .article").forEach(el => {
+        setupSwipe(el);
+
+        el.querySelector(".article-inner")?.addEventListener("click", async (e) => {
+          e.preventDefault();
+          if (el.classList.contains("checking")) return;
+
+          markRead(el.dataset.id);
+          el.classList.add("read");
+          el.classList.remove("expanded");
+
+          const baseURL = el.querySelector(".article-inner")?.getAttribute("href");
+          if (!baseURL) return;
+
+          el.classList.add("checking");
+          try {
+            const finalURL = await resolveArticleURL(baseURL);
+            window.open(finalURL, "_blank", "noopener");
+          } catch {
+            window.open(baseURL, "_blank", "noopener");
+          }
+          el.classList.remove("checking");
+        });
+
+        el.querySelector(".collapsed-bar")?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (el.classList.contains("hidden")) {
+            // Unhide: remove hidden state
+            toggleHidden(el.dataset.id);
+            el.classList.remove("hidden");
+          } else if (el.classList.contains("read")) {
+            // Read: toggle expanded
+            el.classList.toggle("expanded");
+          }
+        });
+      });
+    }
+
+    // --- Swipe handling ---
+    function setupSwipe(el) {
+      let startX, startY, currentX, isDragging = false, isHorizontal = null;
+      const inner = el.querySelector(".article-inner");
+      if (!inner) return;
+
+      inner.addEventListener("touchstart", (e) => {
+        if (el.classList.contains("hidden") || (el.classList.contains("read") && !el.classList.contains("expanded"))) return;
+        const t = e.touches[0];
+        startX = t.clientX;
+        startY = t.clientY;
+        currentX = startX;
+        isDragging = true;
+        isHorizontal = null;
+        el.classList.add("swiping");
+      }, { passive: true });
+
+      inner.addEventListener("touchmove", (e) => {
+        if (!isDragging) return;
+        const t = e.touches[0];
+        currentX = t.clientX;
+        const diffX = startX - currentX;
+        const diffY = Math.abs(t.clientY - startY);
+
+        if (isHorizontal === null && (Math.abs(diffX) > 10 || diffY > 10)) {
+          isHorizontal = Math.abs(diffX) > diffY;
+        }
+
+        if (!isHorizontal) {
+          isDragging = false;
+          el.classList.remove("swiping");
+          inner.style.transform = "";
+          return;
+        }
+
+        if (diffX > 0) {
+          e.preventDefault();
+          inner.style.transform = `translateX(${-diffX}px)`;
+        }
+      }, { passive: false });
+
+      const onEnd = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        const diffX = startX - currentX;
+
+        if (isHorizontal && diffX > 100) {
+          el.classList.remove("swiping");
+          el.classList.add("sliding-out");
+          inner.style.transform = "";
+          setTimeout(() => {
+            toggleHidden(el.dataset.id);
+            el.classList.remove("sliding-out", "swiping");
+            el.classList.add("hidden");
+          }, 300);
+        } else {
+          el.classList.remove("swiping");
+          inner.style.transform = "";
+        }
+      };
+
+      inner.addEventListener("touchend", onEnd, { passive: true });
+      inner.addEventListener("touchcancel", onEnd, { passive: true });
+    }
+
+    // --- Feed tabs ---
+    function renderTabs() {
+      const tabsEl = document.getElementById("feed-tabs");
+      tabsEl.innerHTML = SECTIONS.map(s =>
+        `<button class="feed-tab${s.id === currentSection ? " active" : ""}" data-feed="${s.id}">${s.label}</button>`
+      ).join("");
+
+      tabsEl.querySelectorAll(".feed-tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+          currentSection = btn.dataset.feed;
+          localStorage.setItem(LS_FEED, currentSection);
+          tabsEl.querySelectorAll(".feed-tab").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          loadSection();
+        });
+      });
+    }
+
+    // --- Load section ---
+    async function loadSection() {
+      const statusEl = document.getElementById("status");
+      const articlesEl = document.getElementById("articles");
+
+      statusEl.innerHTML = '<div class="loading-spinner"></div><br>Lade Artikel&hellip;';
+      statusEl.style.display = "block";
+      articlesEl.innerHTML = "";
+
+      const section = SECTIONS.find(s => s.id === currentSection) || SECTIONS[0];
+      const url = ZEIT_BASE + section.path;
+
+      try {
+        const html = await fetchPage(url);
+        articles = parseZeitHTML(html);
+        statusEl.style.display = "none";
+
+        if (articles.length === 0) {
+          statusEl.innerHTML = "Keine Artikel gefunden.";
+          statusEl.style.display = "block";
+        } else {
+          render();
+        }
+      } catch (e) {
+        statusEl.innerHTML = `<div class="error-msg">
+          Artikel konnten nicht geladen werden.<br>
+          <small style="color: var(--zeit-grey)">${esc(e.message || String(e))}</small><br><br>
+          <button class="header-btn" onclick="loadSection()">Erneut versuchen</button>
+        </div>`;
+        statusEl.style.display = "block";
+        console.error("Fetch failed:", e);
+      }
+    }
+
+    // --- Button handlers ---
+    document.getElementById("btn-refresh").addEventListener("click", loadSection);
+    document.getElementById("btn-unhide-all").addEventListener("click", () => {
+      unhideAll();
+      document.querySelectorAll(".article.hidden").forEach(el => el.classList.remove("hidden"));
+    });
+
+    // --- Init ---
+    renderTabs();
+    loadSection();
+  </script>
+</body>
+</html>
