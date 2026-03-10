@@ -695,6 +695,9 @@
       // Mark read in storage but don't collapse yet (skip for liveblogs)
       if (!isLiveblog) markRead(el.dataset.id);
 
+      // Open tab synchronously to preserve user gesture (avoids popup blocker)
+      const tab = window.open("about:blank", "_blank");
+
       el.classList.add("checking");
       let finalURL;
       try {
@@ -704,7 +707,13 @@
       }
       el.classList.remove("checking");
 
-      window.open(finalURL, "_blank", "noopener");
+      if (tab) {
+        tab.opener = null; // equivalent of noopener
+        tab.location.href = finalURL;
+      } else {
+        // Popup blocked despite our efforts — navigate directly
+        window.location.href = finalURL;
+      }
 
       // Don't collapse liveblogs
       if (isLiveblog) return;
