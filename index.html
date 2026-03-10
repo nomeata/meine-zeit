@@ -397,6 +397,7 @@
     const LS_HIDDEN = "mz_hidden";
 
     let articles = [];
+    let lastOpenedId = null;
 
     // --- LocalStorage helpers ---
     function getSet(key) {
@@ -709,7 +710,7 @@
 
       // Mark read in storage but don't collapse yet (skip for liveblogs)
       if (!isLiveblog) markRead(el.dataset.id);
-      sessionStorage.setItem("mz_last", el.dataset.id);
+      lastOpenedId = el.dataset.id;
 
       el.classList.add("checking");
       let finalURL;
@@ -873,13 +874,10 @@
     window.addEventListener("pageshow", (e) => {
       if (e.persisted && articles.length > 0) {
         render();
-        const lastId = sessionStorage.getItem("mz_last");
-        if (lastId) {
-          const el = document.querySelector(`.article[data-id="${CSS.escape(lastId)}"]`);
-          if (el) {
-            el.classList.add("last-visited");
-          }
-          sessionStorage.removeItem("mz_last");
+        if (lastOpenedId) {
+          const el = document.querySelector(`.article[data-id="${CSS.escape(lastOpenedId)}"]`);
+          if (el) el.classList.add("last-visited");
+          lastOpenedId = null;
         }
       }
     });
