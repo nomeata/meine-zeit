@@ -4,8 +4,12 @@ Alternative mobile front-end for zeit.de — a single static HTML file (`index.h
 
 ## Project structure
 
-- `index.html` — the entire app: CSS + JS + HTML in one file
-- `example-index.html` — snapshot of `https://www.zeit.de/index` for reference; useful for inspecting upstream HTML structure and detecting format changes
+- `index.html` — HTML + CSS shell
+- `app.js` — all JS as an ES module; exports `parseZeitHTML`, `renderArticles`, `formatTime`, `esc`, `ZEIT_BASE`
+- `test/example-index.html` — snapshot of `https://www.zeit.de/index` for offline testing
+- `test/test.mjs` — test runner (check / update / snapshot modes)
+- `test/expected-parsed.json` — expected parser output baseline
+- `test/expected-rendered.html` — expected rendered HTML baseline
 - Hosted on GitHub Pages at `zeit.nomeata.de` (HTTPS enforced)
 - Persistent state in `localStorage`, ephemeral state in `sessionStorage`
 
@@ -98,7 +102,7 @@ Two types of article teasers on section pages:
 ## Development
 
 - `flake.nix` provides a dev shell with Node.js and curl: `nix develop`
-- `test-parser.mjs` tests the parser offline against `example-index.html` using jsdom
-- Run: `nix develop -c bash -c "npm install --no-save jsdom && node test-parser.mjs"`
-- `example-index.html` is a snapshot of the zeit.de homepage for offline testing and format comparison
+- Tests: `nix develop -c bash -c "npm install --no-save jsdom && node test/test.mjs"`
+- Update baselines: `node test/test.mjs --update` (regenerates expected output from current code + snapshot)
+- Fresh snapshot: `node test/test.mjs --snapshot` (fetches zeit.de, saves snapshot, updates baselines)
 - This is a NixOS machine; use `nix develop` or `nix shell nixpkgs#<pkg>` for tools
