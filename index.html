@@ -463,6 +463,10 @@
         if (href.startsWith("/")) href = ZEIT_BASE + href;
         if (!href.includes("zeit.de")) return;
 
+        // Skip podcasts and wochenmarkt
+        if (el.querySelector('.audio-player[data-audio-type="podcast"]')) return;
+        if (/podcast|wochenmarkt/i.test(href)) return;
+
         const id = href.replace(/https?:\/\//, "").replace(/[^a-z0-9]/gi, "_");
         if (seen.has(id)) return;
         seen.add(id);
@@ -499,6 +503,9 @@
         let href = linkEl.getAttribute("href") || "";
         if (href.startsWith("/")) href = ZEIT_BASE + href;
         if (!href.includes("zeit.de")) return;
+
+        // Skip podcasts and wochenmarkt
+        if (/podcast|wochenmarkt/i.test(href)) return;
 
         const id = href.replace(/https?:\/\//, "").replace(/[^a-z0-9]/gi, "_");
         if (seen.has(id)) return;
