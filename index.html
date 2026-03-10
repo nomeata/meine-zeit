@@ -379,7 +379,7 @@
     const ZEIT_BASE = "https://www.zeit.de";
 
     const CORS_PROXIES = [
-      url => `https://cors.nomeata.de/${url}`,
+      url => `https://cors.nomeata.de/proxy/${url.replace('https://', '')}`,
     ];
 
     const LS_READ   = "mz_read";
