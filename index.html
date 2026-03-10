@@ -629,7 +629,7 @@
           html += `<div class="${cls}" data-id="${esc(a.id)}">
   <div class="swipe-bg">Ausblenden</div>
   <div class="swipe-bg-right">Öffnen</div>
-  <a class="article-inner" href="${href}" target="_blank" rel="noopener">
+  <a class="article-inner" href="${href}">
     <img class="article-img" src="${esc(a.image)}" alt="" loading="lazy">
     <div class="article-body">
       <div class="article-text">
@@ -648,7 +648,7 @@
           html += `<div class="${cls}" data-id="${esc(a.id)}">
   <div class="swipe-bg">Ausblenden</div>
   <div class="swipe-bg-right">Öffnen</div>
-  <a class="article-inner" href="${href}" target="_blank" rel="noopener">
+  <a class="article-inner" href="${href}">
     <div class="article-body">
       <div class="article-text">
         ${a.kicker ? `<div class="article-kicker">${esc(a.kicker)}</div>` : ""}
@@ -664,7 +664,7 @@
           html += `<div class="${cls}" data-id="${esc(a.id)}">
   <div class="swipe-bg">Ausblenden</div>
   <div class="swipe-bg-right">Öffnen</div>
-  <a class="article-inner" href="${href}" target="_blank" rel="noopener">
+  <a class="article-inner" href="${href}">
     <div class="article-body">
       <div class="article-text">
         ${a.kicker ? `<div class="article-kicker">${badges}${esc(a.kicker)}</div>` : (badges ? `<div class="article-kicker">${badges}</div>` : "")}
@@ -695,9 +695,6 @@
       // Mark read in storage but don't collapse yet (skip for liveblogs)
       if (!isLiveblog) markRead(el.dataset.id);
 
-      // Open tab synchronously to preserve user gesture (avoids popup blocker)
-      const tab = window.open("about:blank", "_blank");
-
       el.classList.add("checking");
       let finalURL;
       try {
@@ -707,32 +704,7 @@
       }
       el.classList.remove("checking");
 
-      if (tab) {
-        tab.opener = null; // equivalent of noopener
-        tab.location.href = finalURL;
-      } else {
-        // Popup blocked despite our efforts — navigate directly
-        window.location.href = finalURL;
-      }
-
-      // Don't collapse liveblogs
-      if (isLiveblog) return;
-
-      // Collapse when the user returns to this tab
-      const collapse = () => {
-        el.classList.add("read");
-        el.classList.remove("expanded");
-        document.removeEventListener("visibilitychange", onReturn);
-      };
-      const onReturn = () => {
-        if (!document.hidden) collapse();
-      };
-      // If the page is already visible (popup blocker etc.), collapse after a delay
-      if (!document.hidden) {
-        setTimeout(collapse, 500);
-      } else {
-        document.addEventListener("visibilitychange", onReturn);
-      }
+      window.location.href = finalURL;
     }
 
     function attachListeners() {
@@ -881,6 +853,11 @@
 
     // --- Init ---
     loadSection();
+
+    // Re-render on back navigation (bfcache) to reflect read state
+    window.addEventListener("pageshow", (e) => {
+      if (e.persisted && articles.length > 0) render();
+    });
   </script>
 </body>
 </html>
