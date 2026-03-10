@@ -317,6 +317,11 @@
     /* Last-visited indicator */
     .article.last-visited {
       border-bottom: 3px solid var(--zeit-red);
+      animation: fade-marker 3s ease forwards;
+    }
+    @keyframes fade-marker {
+      0%, 50% { border-bottom-color: var(--zeit-red); }
+      100% { border-bottom-color: transparent; }
     }
 
     /* Slide-out animation */
