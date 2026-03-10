@@ -399,6 +399,10 @@
       const s = getSet(LS_READ); s.add(id); saveSet(LS_READ, s);
     }
 
+    function markUnread(id) {
+      const s = getSet(LS_READ); s.delete(id); saveSet(LS_READ, s);
+    }
+
     function toggleHidden(id) {
       const s = getSet(LS_HIDDEN);
       if (s.has(id)) s.delete(id); else s.add(id);
@@ -735,12 +739,14 @@
         el.querySelector(".collapsed-bar")?.addEventListener("click", (e) => {
           e.stopPropagation();
           if (el.classList.contains("hidden")) {
-            // Unhide: remove hidden state
+            // Unhide and unread
             toggleHidden(el.dataset.id);
-            el.classList.remove("hidden");
+            markUnread(el.dataset.id);
+            el.classList.remove("hidden", "read");
           } else if (el.classList.contains("read")) {
-            // Read: toggle expanded
-            el.classList.toggle("expanded");
+            // Unread
+            markUnread(el.dataset.id);
+            el.classList.remove("read", "expanded");
           }
         });
       });
