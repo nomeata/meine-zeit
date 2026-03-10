@@ -826,41 +826,10 @@
       inner.addEventListener("touchcancel", onEnd, { passive: true });
     }
 
-    // --- Session cache ---
-    const SS_CACHE = "mz_cache";
-    const CACHE_MAX_AGE = 20 * 60 * 1000; // 20 minutes
-
-    function getCachedArticles() {
-      try {
-        const raw = sessionStorage.getItem(SS_CACHE);
-        if (!raw) return null;
-        const { ts, data } = JSON.parse(raw);
-        if (Date.now() - ts > CACHE_MAX_AGE) return null;
-        return data;
-      } catch { return null; }
-    }
-
-    function setCachedArticles(data) {
-      try {
-        sessionStorage.setItem(SS_CACHE, JSON.stringify({ ts: Date.now(), data }));
-      } catch { /* quota exceeded — ignore */ }
-    }
-
     // --- Load articles ---
-    async function loadSection(forceRefresh) {
+    async function loadSection() {
       const statusEl = document.getElementById("status");
       const articlesEl = document.getElementById("articles");
-
-      // Use cache if available (e.g. back navigation)
-      if (!forceRefresh) {
-        const cached = getCachedArticles();
-        if (cached) {
-          articles = cached;
-          statusEl.style.display = "none";
-          render();
-          return;
-        }
-      }
 
       statusEl.innerHTML = '<div class="loading-spinner"></div><br>Lade Artikel&hellip;';
       statusEl.style.display = "block";
@@ -871,7 +840,6 @@
       try {
         const html = await fetchPage(url);
         articles = parseZeitHTML(html);
-        setCachedArticles(articles);
         statusEl.style.display = "none";
 
         if (articles.length === 0) {
@@ -884,7 +852,7 @@
         statusEl.innerHTML = `<div class="error-msg">
           Artikel konnten nicht geladen werden.<br>
           <small style="color: var(--zeit-grey)">${esc(e.message || String(e))}</small><br><br>
-          <button class="header-btn" onclick="loadSection(true)">Erneut versuchen</button>
+          <button class="header-btn" onclick="loadSection()">Erneut versuchen</button>
         </div>`;
         statusEl.style.display = "block";
         console.error("Fetch failed:", e);
@@ -892,7 +860,7 @@
     }
 
     // --- Button handlers ---
-    document.getElementById("btn-refresh").addEventListener("click", () => loadSection(true));
+    document.getElementById("btn-refresh").addEventListener("click", loadSection);
     document.getElementById("btn-unhide-all").addEventListener("click", () => {
       unhideAll();
       document.querySelectorAll(".article.hidden").forEach(el => el.classList.remove("hidden"));
