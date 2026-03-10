@@ -887,6 +887,7 @@
           statusEl.style.display = "block";
         } else {
           render();
+          highlightLast();
         }
       } catch (e) {
         statusEl.innerHTML = `<div class="error-msg">
