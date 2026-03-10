@@ -471,6 +471,7 @@
         if (!href.includes("zeit.de")) return null;
 
         if (el.querySelector('.audio-player[data-audio-type="podcast"]')) return null;
+        if (el.querySelector('.zon-teaser__kicker--ad')) return null;
         if (/podcast|wochenmarkt/i.test(href)) return null;
 
         const id = href.replace(/https?:\/\//, "").replace(/[^a-z0-9]/gi, "_");
@@ -478,7 +479,6 @@
         seen.add(id);
 
         const kicker = el.querySelector(".zon-teaser__kicker-text")?.textContent?.trim() || "";
-        if (/verlagsangebot|anzeige/i.test(kicker)) return null;
         const title = el.querySelector(".zon-teaser__title")?.textContent?.trim() || "";
         const summary = el.querySelector(".zon-teaser__summary")?.textContent?.trim() || "";
         const isZPlus = el.hasAttribute("data-zplus") || !!el.querySelector(".zplus-logo");
