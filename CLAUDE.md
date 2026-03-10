@@ -10,9 +10,19 @@ Alternative mobile front-end for zeit.de — a single static HTML file (`index.h
 
 ## How it works
 
-- Fetches zeit.de section pages (e.g. `https://www.zeit.de/index`) via CORS proxy (`corsproxy.io`, fallback `allorigins.win`)
+- Fetches zeit.de section pages (e.g. `https://www.zeit.de/index`) via a self-hosted CORS proxy
 - Parses the returned HTML with `DOMParser` to extract articles
-- corsproxy.io blocks server-side requests (curl) but works from browsers
+- Hosted on GitHub Pages at `zeit.nomeata.de`
+
+## CORS proxy
+
+- Self-hosted Apache reverse proxy at `cors.nomeata.de` (configured in the server's NixOS config, not this repo)
+- Path-based: `https://cors.nomeata.de/proxy/www.zeit.de/index` proxies to `https://www.zeit.de/index`
+- JS constructs URL as `` `https://cors.nomeata.de/proxy/${url.replace('https://', '')}` ``
+- Access restricted: only `*.nomeata.de` origins (checked via `Require expr` on `Origin` header) and localhost
+- Destination whitelist: only `www.zeit.de`, `newsfeed.zeit.de`, `img.zeit.de` via RewriteRule pattern
+- Strips upstream CORS headers and sets its own, reflecting the request `Origin`
+- Apache needed `//` in path avoided by using `/proxy/` prefix instead of embedding full URL
 
 ## zeit.de HTML structure
 
