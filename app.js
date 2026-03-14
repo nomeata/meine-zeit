@@ -401,8 +401,8 @@ if (typeof window !== "undefined" && document.getElementById("articles")) {
       const diffX = startX - currentX;
       const diffY = Math.abs(t.clientY - startY);
 
-      if (isHorizontal === null && (Math.abs(diffX) > 10 || diffY > 10)) {
-        isHorizontal = Math.abs(diffX) > diffY;
+      if (isHorizontal === null && Math.abs(diffX) + diffY > 20) {
+        isHorizontal = Math.abs(diffX) > diffY * 0.7;
       }
 
       if (!isHorizontal) {
