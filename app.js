@@ -383,7 +383,7 @@ if (typeof window !== "undefined" && document.getElementById("articles")) {
     let startX, currentX, isDragging = false;
     const inner = el.querySelector(".article-inner");
     if (!inner) return;
-    const DEAD_ZONE = 10;
+    const DEAD_ZONE = 30;
 
     inner.addEventListener("touchstart", (e) => {
       if (el.classList.contains("hidden") || (el.classList.contains("read") && !el.classList.contains("expanded"))) return;
