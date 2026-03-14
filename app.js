@@ -380,56 +380,43 @@ if (typeof window !== "undefined" && document.getElementById("articles")) {
 
   // --- Swipe handling ---
   function setupSwipe(el) {
-    let startX, startY, currentX, isDragging = false, isHorizontal = null;
+    let startX, currentX, isDragging = false;
     const inner = el.querySelector(".article-inner");
     if (!inner) return;
+    const DEAD_ZONE = 10;
 
     inner.addEventListener("touchstart", (e) => {
       if (el.classList.contains("hidden") || (el.classList.contains("read") && !el.classList.contains("expanded"))) return;
-      const t = e.touches[0];
-      startX = t.clientX;
-      startY = t.clientY;
+      startX = e.touches[0].clientX;
       currentX = startX;
       isDragging = true;
-      isHorizontal = null;
     }, { passive: true });
 
     inner.addEventListener("touchmove", (e) => {
       if (!isDragging) return;
-      const t = e.touches[0];
-      currentX = t.clientX;
+      currentX = e.touches[0].clientX;
       const diffX = startX - currentX;
-      const diffY = Math.abs(t.clientY - startY);
 
-      if (isHorizontal === null && Math.abs(diffX) + diffY > 20) {
-        isHorizontal = Math.abs(diffX) > diffY * 0.7;
-      }
+      if (Math.abs(diffX) < DEAD_ZONE) return;
 
-      if (!isHorizontal) {
-        isDragging = false;
-        el.classList.remove("swiping-left", "swiping-right");
-        inner.style.transform = "";
-        return;
-      }
-
-      e.preventDefault();
+      el.classList.add("swiping");
       if (diffX > 0) {
         el.classList.add("swiping-left");
         el.classList.remove("swiping-right");
-        inner.style.transform = `translateX(${-diffX}px)`;
       } else {
         el.classList.add("swiping-right");
         el.classList.remove("swiping-left");
-        inner.style.transform = `translateX(${-diffX}px)`;
       }
-    }, { passive: false });
+      inner.style.transform = `translateX(${-diffX}px)`;
+    }, { passive: true });
 
     const onEnd = () => {
       if (!isDragging) return;
       isDragging = false;
+      el.classList.remove("swiping");
       const diffX = startX - currentX;
 
-      if (isHorizontal && diffX > 100) {
+      if (diffX > 100) {
         el.classList.remove("swiping-left", "swiping-right");
         el.classList.add("sliding-out");
         inner.style.transform = "";
@@ -438,7 +425,7 @@ if (typeof window !== "undefined" && document.getElementById("articles")) {
           el.classList.remove("sliding-out");
           el.classList.add("hidden");
         }, 300);
-      } else if (isHorizontal && diffX < -100) {
+      } else if (diffX < -100) {
         el.classList.remove("swiping-left");
         el.classList.add("swiping-right");
         inner.style.transform = `translateX(${-diffX}px)`;
