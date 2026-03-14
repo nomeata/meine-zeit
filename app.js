@@ -397,8 +397,16 @@ if (typeof window !== "undefined" && document.getElementById("articles")) {
       currentX = e.touches[0].clientX;
       const diffX = startX - currentX;
 
-      if (Math.abs(diffX) < DEAD_ZONE) return;
+      if (Math.abs(diffX) < DEAD_ZONE) {
+        if (el.classList.contains("swiping")) {
+          el.classList.remove("swiping", "swiping-left", "swiping-right");
+          inner.style.transform = "";
+        }
+        return;
+      }
 
+      // Subtract dead zone so movement starts from 0
+      const offset = diffX > 0 ? diffX - DEAD_ZONE : diffX + DEAD_ZONE;
       el.classList.add("swiping");
       if (diffX > 0) {
         el.classList.add("swiping-left");
@@ -407,7 +415,7 @@ if (typeof window !== "undefined" && document.getElementById("articles")) {
         el.classList.add("swiping-right");
         el.classList.remove("swiping-left");
       }
-      inner.style.transform = `translateX(${-diffX}px)`;
+      inner.style.transform = `translateX(${-offset}px)`;
     }, { passive: true });
 
     const onEnd = () => {
