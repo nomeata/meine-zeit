@@ -8,6 +8,8 @@ Alternative mobile front-end for zeit.de — a single static HTML file (`index.h
 - `app.js` — all JS as an ES module; exports `parseZeitHTML`, `renderArticles`, `formatTime`, `esc`, `ZEIT_BASE`
 - `test/example-index.html` — snapshot of `https://www.zeit.de/index` for offline testing
 - `test/test.mjs` — test runner (check / update / snapshot modes)
+- `test/itest.mjs` — headless end-to-end test of the Centinel challenge flow (happy path); needs Chromium
+- `test/itest-cert.pem` / `test/itest-key.pem` — throwaway self-signed cert for the itest's fake collector
 - `test/expected-parsed.json` — expected parser output baseline
 - `test/expected-rendered.html` — expected rendered HTML baseline
 - Hosted on GitHub Pages at `zeit.nomeata.de` (HTTPS enforced)
@@ -131,8 +133,9 @@ Two types of article teasers on section pages:
 
 ## Development
 
-- `flake.nix` provides a dev shell with Node.js and curl: `nix develop`
+- `flake.nix` provides a dev shell with Node.js, curl and Chromium: `nix develop`
 - Tests: `nix develop -c bash -c "npm install --no-save jsdom && node test/test.mjs"`
+- Headless end-to-end test of the challenge flow: `nix develop -c node test/itest.mjs` — serves the app with a patched proxy URL plus a fake proxy/collector on loopback, runs headless Chromium through the whole challenge dance (403 → script → attestation → reload → content), and asserts the articles render. Chromium can be overridden with `CHROMIUM=/path/to/chromium`
 - Update baselines: `node test/test.mjs --update` (regenerates expected output from current code + snapshot)
 - Fresh snapshot: `node test/test.mjs --snapshot` no longer works (zeit.de answers with the 403 challenge). Save `https://www.zeit.de/index` from a browser as `test/example-index.html`, then run `--update`
 - This is a NixOS machine; use `nix develop` or `nix shell nixpkgs#<pkg>` for tools

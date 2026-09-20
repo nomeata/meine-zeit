@@ -10,6 +10,7 @@
         packages = [
           pkgs.nodejs
           pkgs.curl
+          pkgs.chromium # for test/itest.mjs (headless end-to-end test)
         ];
       };
     };
