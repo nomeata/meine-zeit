@@ -256,20 +256,217 @@ if (typeof window !== "undefined" && document.getElementById("articles")) {
   }
 
   // --- Fetch via CORS proxy ---
-  async function fetchPage(url) {
+  // zeit.de gates HTML requests behind a JavaScript proof-of-work wall
+  // ("Centinel"): without a valid clearance session the edge answers 403
+  // with a tiny challenge page instead of the content. This app solves the
+  // challenge in the reader's own browser (see startChallenge below) and then
+  // hands the validated session id to the proxy as ?_mz_centinel=<id>, which
+  // the proxy maps to the upstream `_centinel` cookie (see CLAUDE.md for the
+  // required Apache snippet).
+  const LS_CENTINEL = "mz_centinel";      // validated clearance session {id, ts}
+  const SS_CHALLENGE = "mz_challenge";    // in-progress solve, survives the script's reloads
+  const CHALLENGE_MAX_AGE = 3 * 60 * 1000;
+  const CHALLENGE_MAX_ROUNDS = 5;
+
+  function getCentinelId() {
+    try { return JSON.parse(localStorage.getItem(LS_CENTINEL) || "null")?.id || null; }
+    catch { return null; }
+  }
+
+  function setCentinelId(id) {
+    localStorage.setItem(LS_CENTINEL, JSON.stringify({ id, ts: Date.now() }));
+  }
+
+  function getChallengeState() {
+    try { return JSON.parse(sessionStorage.getItem(SS_CHALLENGE) || "null"); }
+    catch { return null; }
+  }
+
+  function setChallengeState(st) {
+    sessionStorage.setItem(SS_CHALLENGE, JSON.stringify(st));
+  }
+
+  function clearChallengeState() {
+    sessionStorage.removeItem(SS_CHALLENGE);
+  }
+
+  // Low-level fetch through the proxy; resolves {status, text} even for 403.
+  async function proxyFetch(url, { method = "GET", centinelId = null, timeout = 15000 } = {}) {
     let lastError;
     for (const mkProxy of CORS_PROXIES) {
       try {
-        const resp = await fetch(mkProxy(url), { signal: AbortSignal.timeout(15000) });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const text = await resp.text();
+        let u = mkProxy(url);
+        if (centinelId) u += (u.includes("?") ? "&" : "?") + "_mz_centinel=" + encodeURIComponent(centinelId);
+        const resp = await fetch(u, { method, signal: AbortSignal.timeout(timeout) });
+        const text = method === "HEAD" ? "" : await resp.text();
         if (text.startsWith('{"error"')) throw new Error(text);
-        return text;
+        return { status: resp.status, text };
       } catch (e) {
         lastError = e;
       }
     }
     throw lastError;
+  }
+
+  // --- Centinel challenge ---
+  const RE_CHALLENGE = /window\.__centinel|centinelanalytica\.com/;
+  const RE_BLOCKED = /Ihre Anfrage wurde blockiert|Da ist etwas schiefgelaufen/;
+
+  const dbg = (...args) => console.log("[mz]", ...args);
+
+  function parseChallenge(html) {
+    const sessionId = html.match(/sessionId:"([0-9a-f-]{36})"/)?.[1];
+    const se = html.match(/se:"([^"]+)"/)?.[1];
+    const scriptUrl = html.match(/<script src="(https:\/\/collector\.[^"]+)"\s*defer>/)?.[1];
+    return (sessionId && se && scriptUrl) ? { sessionId, se, scriptUrl } : null;
+  }
+
+  function showChallengeStatus(round) {
+    const statusEl = document.getElementById("status");
+    statusEl.innerHTML = `<div class="loading-spinner"></div><br>
+      Sicherheitspr&uuml;fung bei zeit.de (Runde ${round})&hellip;<br>
+      <small style="color: var(--zeit-grey)">L&auml;uft automatisch, dauert einen Moment.</small>`;
+    statusEl.style.display = "block";
+    document.getElementById("articles").innerHTML = "";
+  }
+
+  function reloadIfSolving() {
+    if (getChallengeState()) location.reload();
+  }
+
+  // Runs zeit.de's own challenge script with the given parameters. The script
+  // fingerprints this browser, does the proof of work, POSTs one attestation
+  // to the collector, and then (on zeit.de) reloads the page. We observe the
+  // attestation via a fetch wrapper and reload ourselves in case the script
+  // does not; the boot path (resumeChallenge) then tests whether the session
+  // clears zeit.de via the proxy yet.
+  let fetchWrapped = false;
+
+  function runChallengeScript(params) {
+    if (!fetchWrapped) {
+      fetchWrapped = true;
+      const origFetch = window.fetch;
+      window.fetch = function (u, o) {
+        const p = origFetch.apply(this, arguments);
+        try {
+          if (String(u?.url || u).includes("centinelanalytica.com")) {
+            p.then(r => {
+              dbg("attestation response:", r.status);
+              if (r.ok) setTimeout(reloadIfSolving, 2500);
+            }, () => {});
+          }
+        } catch { /* observation only */ }
+        return p;
+      };
+    }
+    dbg("injecting challenge script for session", params.sessionId);
+    document.cookie = `_centinel=${params.sessionId}; Path=/; Max-Age=86400; SameSite=Lax`;
+    window.__centinel = { sessionId: params.sessionId, se: params.se };
+    const s = document.createElement("script");
+    s.src = params.scriptUrl;
+    s.onerror = () => dbg("challenge script failed to load (blocked by extension?)");
+    document.head.appendChild(s);
+    // Watchdog: no attestation within 45s — try another round.
+    setTimeout(reloadIfSolving, 45000);
+  }
+
+  function startChallenge(params) {
+    const prev = getChallengeState();
+    const round = (prev?.round || 0) + 1;
+    dbg(`challenge round ${round}, session ${params.sessionId}`);
+    setChallengeState({ ...params, round, since: prev?.since || Date.now() });
+    showChallengeStatus(round);
+    runChallengeScript(params);
+  }
+
+  // Fetches the index page, starting a challenge solve when zeit.de answers
+  // with the 403 interstitial. Returns the HTML, or null while a solve is in
+  // progress (splash is shown and a page reload will follow).
+  async function fetchPage(url) {
+    const centinelId = getCentinelId();
+    const r = await proxyFetch(url, { centinelId });
+    dbg("fetchPage", url, "→ HTTP", r.status, centinelId ? "(with session)" : "(no session)");
+    if (r.status === 200) return r.text;
+
+    if (r.status === 403 && RE_BLOCKED.test(r.text) && centinelId) {
+      // Stored session no longer accepted — drop it and take the fresh challenge.
+      dbg("stored session was rejected (block page); dropping it");
+      localStorage.removeItem(LS_CENTINEL);
+      const r2 = await proxyFetch(url);
+      if (r2.status === 200) return r2.text;
+      if (r2.status === 403 && RE_CHALLENGE.test(r2.text)) {
+        const p = parseChallenge(r2.text);
+        if (p) { startChallenge(p); return null; }
+      }
+      throw new Error("zeit.de blockiert die Anfrage gerade — bitte später erneut versuchen");
+    }
+    if (r.status === 403 && RE_BLOCKED.test(r.text)) {
+      dbg("blocked by zeit.de (no session)");
+      throw new Error("zeit.de blockiert die Anfrage gerade — bitte später erneut versuchen");
+    }
+    if (r.status === 403 && RE_CHALLENGE.test(r.text)) {
+      dbg("challenge page received");
+      const p = parseChallenge(r.text);
+      if (p) { startChallenge(p); return null; }
+      throw new Error("Sicherheitsprüfung von zeit.de nicht erkannt");
+    }
+    throw new Error(`HTTP ${r.status}`);
+  }
+
+  // Resumes an in-progress solve after the challenge script reloaded the
+  // page. Returns true while a solve is in progress (caller must not start a
+  // normal load then).
+  function resumeChallenge() {
+    const st = getChallengeState();
+    if (!st) return false;
+
+    if (Date.now() - st.since > CHALLENGE_MAX_AGE || st.round > CHALLENGE_MAX_ROUNDS) {
+      dbg("challenge gave up after round", st.round);
+      clearChallengeState();
+      const statusEl = document.getElementById("status");
+      statusEl.innerHTML = `<div class="error-msg">
+          Die Sicherheitspr&uuml;fung von zeit.de war nicht erfolgreich.<br>
+          <small style="color: var(--zeit-grey)">(L&auml;uft der Proxy mit dem _mz_centinel-Patch? Siehe README.md.)</small><br><br>
+          <button class="header-btn" onclick="loadSection(true)">Erneut versuchen</button>
+        </div>`;
+      statusEl.style.display = "block";
+      return true;
+    }
+
+    dbg(`resuming challenge round ${st.round}, testing session ${st.sessionId}`);
+    showChallengeStatus(st.round);
+
+    (async () => {
+      let r;
+      try { r = await proxyFetch(ZEIT_BASE + "/index", { centinelId: st.sessionId }); }
+      catch { dbg("session test failed (network), retrying"); setTimeout(reloadIfSolving, 5000); return; }
+
+      if (r.status === 200) {
+        // Session cleared — keep it and load for real.
+        dbg("session accepted, solved in round", st.round);
+        setCentinelId(st.sessionId);
+        clearChallengeState();
+        loadSection(true);
+        return;
+      }
+      if (RE_BLOCKED.test(r.text)) {
+        // Negative verdict — this session is burnt; start over with a fresh one.
+        dbg("session rejected (block page), starting fresh");
+        setChallengeState({ sessionId: null, se: null, scriptUrl: null, round: st.round, since: st.since });
+        loadSection(true);
+        return;
+      }
+      if (RE_CHALLENGE.test(r.text)) {
+        dbg("session not accepted yet, next round");
+        const params = parseChallenge(r.text);
+        if (params) { startChallenge(params); return; } // next round, fresh params
+      }
+      // Unexpected answer — start over cleanly.
+      dbg("unexpected response while resuming:", r.status);
+      clearChallengeState();
+      loadSection(true);
+    })();
+    return true;
   }
 
   // --- Komplettansicht check ---
@@ -304,22 +501,16 @@ if (typeof window !== "undefined" && document.getElementById("articles")) {
     }
 
     const komplettUrl = clean + "/komplettansicht";
-    for (const mkProxy of CORS_PROXIES) {
-      try {
-        const resp = await fetch(mkProxy(komplettUrl), {
-          method: "HEAD",
-          signal: AbortSignal.timeout(5000),
-        });
-        const hasIt = resp.ok;
-        setKomplettCache(clean, hasIt);
-        return hasIt ? komplettUrl : clean;
-      } catch {
-        // proxy might not support HEAD, try next
-      }
+    try {
+      const r = await proxyFetch(komplettUrl, { method: "HEAD", centinelId: getCentinelId(), timeout: 5000 });
+      if (r.status === 403) return clean; // clearance missing/expired — don't cache a guess
+      const hasIt = r.status >= 200 && r.status < 300;
+      setKomplettCache(clean, hasIt);
+      return hasIt ? komplettUrl : clean;
+    } catch {
+      // proxy unreachable — don't cache a guess either
+      return clean;
     }
-
-    setKomplettCache(clean, false);
-    return clean;
   }
 
   // --- Render ---
@@ -485,6 +676,7 @@ if (typeof window !== "undefined" && document.getElementById("articles")) {
 
     try {
       const html = await fetchPage(url);
+      if (html === null) return; // challenge solve in progress; splash shown, reload follows
       articles = parseZeitHTML(html);
       setCachedArticles(articles);
       statusEl.style.display = "none";
@@ -525,7 +717,7 @@ if (typeof window !== "undefined" && document.getElementById("articles")) {
 
   // --- Init ---
   window.loadSection = loadSection; // exposed for onclick in error message
-  loadSection();
+  if (!resumeChallenge()) loadSection();
 
   // Re-render on back navigation (bfcache) to reflect read state
   window.addEventListener("pageshow", (e) => {
